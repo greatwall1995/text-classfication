@@ -36,27 +36,48 @@ def strQ2B(s):
 		res += unichr(inside_code)
 	return res
 
+def modify(s):
+	ret = re.sub(r'<[^<>]*>', '', s)
+	ret = strQ2B(ret)
+	l = len(ret);
+	tmp = ''
+	for i in xrange(l):
+		if (u'A' <= ret[i] and ret[i] <= u'Z'):
+			tmp += unichr(ord(ret[i]) - ord(u'A') + ord(u'a'));
+		elif (ret[i] == u'\u3010'):
+			tmp += u'['
+		elif (ret[i] == u'\u3011'):
+			tmp += u']'
+		elif (ret[i] == u'\u2571'):
+			tmp += u'/'
+		elif (ret[i] == u'\u2014'):
+			tmp += u'-'
+		elif (ret[i] == u'\u00a0' or ret[i] == u'\n' or ret[i] == u'\r' or ret[i] == u'\t'):
+			tmp += u' '
+		else:
+			tmp += ret[i]
+	ret = pypinyin.pinyin(tmp)
+	return ret
+
 def prep(name, input_size):
 	'''
 	Dealing with raw data.
 	'''
 	
 	f_out = file('../tmp/' + name + '.json', 'w')
-
+	
+	cnt = 0;
+	
 	with open('../data/' + name + '.json', 'r') as f_in:
-		
-		cnt = 0
-		
 		for line in f_in:
 			
 			cnt += 1
+			if (cnt % 1000 == 0):
+				print cnt
+			
 			obj = json.loads(line)
-			content = re.sub(r'<[^<>]*>', '', obj['content'])
-			content = strQ2B(content)
-			content = pypinyin.pinyin(content)
-			title = re.sub(r'<[^<>]*>', '', obj['title'])
-			title = strQ2B(title)
-			title = pypinyin.pinyin(title)
+			content = modify(obj['content'])
+			title = modify(obj['title'])
 			res = ''
 			pos = 0
 			cLen = len(content)
@@ -109,7 +130,7 @@ def stat(name, dic):
 		for line in f:
 			cont = json.loads(line)['content']
 			for c in cont:
-				dic[c] = dic.get('c', 0) + 1
+				dic[c] = dic.get(c, 0) + 1
 
 def statistic():
 	dic = {}
@@ -120,7 +141,6 @@ def statistic():
 	
 	stat_file = file('../tmp/stat.txt', 'w')
 	for c in dic:
-		tc = c
-		c = unicode(c).encode('utf8')
-		stat_file.write(c + (": %d\n" % dic[tc]))
+		obj = {'char': c, 'num': dic[c]}
+		stat_file.write(json.dumps(obj) + '\n')
 	stat_file.close()
