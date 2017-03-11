@@ -136,7 +136,7 @@ def prep(name, input_size):
 		
 	f_out.close()
 
-def preprocess(input_size):
+def preprocess(input_size=2048):
 	
 	print 'Preprocessing...'
 	prep("train", input_size)
