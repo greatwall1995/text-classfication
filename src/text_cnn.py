@@ -39,12 +39,12 @@ def load_data(name, voc, input_size=2048, mode='char'):
 			if (name != 'test'):
 				label.append(int(obj['label']))
 			id.append(obj['id'])
-	print ''
 	return [content, label, id]
 
 def make_text_cnn(batch_size, input_size, voc_size, num_embed, filter_size,
 				  num_filter, fc_size, dropout):
 	input_x = mx.sym.Variable('data')
+	input_y = mx.sym.Variable('softmax_label')
 	embed_layer = mx.sym.Embedding(data=input_x, input_dim=voc_size, output_dim=num_embed,
 								  name='embed')
 	cnn = mx.sym.Reshape(data=embed_layer, shape=(batch_size, 1, input_size, num_embed))
@@ -64,8 +64,8 @@ def make_text_cnn(batch_size, input_size, voc_size, num_embed, filter_size,
 		fc = mx.sym.FullyConnected(name='fc%d' % i, data=fc, num_hidden=fc_size[i])
   		fc = mx.sym.Activation(data=fc, act_type='relu')
     	#fc = mx.sym.BatchNorm(data=fc)
-	fc = mx.sym.FullyConnected(name='final', data=fc, num_hidden=1)
-	sm = mx.sym.LogisticRegressionOutput(data=fc)
+	fc = mx.sym.FullyConnected(name='final', data=fc, num_hidden=2)
+	sm = mx.sym.SoftmaxOutput(data=fc, label=input_y)
 	return sm
 
 def setup_cnn_model(ctx, batch_size, input_size, voc_size, num_embed, filter_size,
@@ -98,26 +98,10 @@ def calc_auc(label, pred):
 			res += (ct1 / (n1 + 0.0)) * (1. / (n0 + 0.0))
 	return res
 
-class eval_call(object):
-	def __call__(self, param):
-		print "eval_call()"
-		print param
-		print ""
-
-def epoch_call():
-	def _callback(iter_no, sym, arg, aux):
-		print "epoch_call()"
-		print "iter_no = ", iter_no
-		print "sym = ", sym
-		print "arg = ", arg
-		print "aux = ", aux
-		print ""
-	return _callback
-
 def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 	print 'Trainning model...'	
-	epoch = 5
-	learning_rate = 1e-1
+	epoch = 2
+	learning_rate = 1e-3
 	reg = 5e-4
 	
 	model = mx.model.FeedForward(
@@ -127,7 +111,7 @@ def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 		learning_rate=learning_rate,
 		numpy_batch_size=batch_size,
 		wd=reg,
-		num_epoch=1
+		num_epoch=epoch
 	)
 	
 	print np.array(data_train[0]).shape
@@ -138,7 +122,7 @@ def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 	print batch_size
 	
 	train = mx.io.NDArrayIter(np.array(data_train[0]), np.array(data_train[1]),
-							  batch_size=batch_size, label_name='logisticregressionoutput0_label')#, shuffle=True)
+							  batch_size=batch_size)#, shuffle=True)
 	print batch_size
 	val = mx.io.NDArrayIter(np.array(data_val[0]), np.array(data_val[1]),
 							batch_size=batch_size)
@@ -146,16 +130,15 @@ def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 	test = mx.io.NDArrayIter(np.array(data_test[0]), np.array(data_test[1]),
 							 batch_size=batch_size)
 	
-	best_model = None
-	best_auc = -1
-	
-	#model.fit(X=train, eval_data=val,
-	#		  batch_end_callback = mx.callback.Speedometer(batch_size, 1),
-	#		  epoch_end_callback = epoch_call(),
-	#		  eval_end_callback = eval_call())
-	
+	model.fit(X=train, eval_data=val, eval_metric='acc',
+			  batch_end_callback = mx.callback.Speedometer(batch_size, 1))
+	prob = model.predict(np.array(data_val[0]))[:, 1]
+	print prob
+	auc = calc_auc(data_val[1], prob)
+	print "AUC = %f" % (auc)
+	'''
 	for i in xrange(epoch):
-		model.fit(X=train, batch_end_callback = mx.callback.Speedometer(batch_size, 1))
+		model.fit(X=np.array(data_train[0]), y=np.array(data_train[1]), batch_end_callback = mx.callback.Speedometer(batch_size, 1))
 		prob = model.predict(np.array(data_val[0]))#, num_batch=batch_size)
 		print prob
 		auc = calc_auc(data_val[1], prob)
@@ -164,18 +147,19 @@ def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 		if auc > best_auc:
 			best_auc = auc
 			best_model = model
+	'''
 	
-	print "Best AUC = %f" % best_auc
-	best_model.save('best_model', 0)
-	prob = best_model.predict(test, num_batch=batch_size)
-	f_out1 = file('../data/test.txt', 'w')
-	print prob
-	f_out1.close()
+	model.save('model', 0)
+	prob = model.predict(np.array(data_test[0]))[:, 1]
+	#f_out1 = file('../data/test.txt', 'w')
+	#f_out1.write(prob)
+	#f_out1.close()
 	f_out = file('../data/test.csv', 'w')
-	print 'id, pred'
-	for (i, j) in xrange(zip(data_text, prob)):
-		print i,j
+	f_out.write('id, pred\n')
+	for (i, j) in zip(data_test[2], prob):
+		f_out.write('%s,%.200f\n'%(i,j))
 	f_out.close()
+	
 
 def main():
 	
@@ -183,9 +167,9 @@ def main():
 	input_size = 2048
 	num_embed = 32#128
 	batch_size = 64
-	filter_size = [5, 3]
-	num_filter = [16, 18]#[128, 256]
-	fc_size = [50]#[200]
+	filter_size = [3]
+	num_filter = [16]#[128, 256]
+	fc_size = [10]#[200]
 	dropout = 0.5
 	
 	voc = get_voc('dict1')
