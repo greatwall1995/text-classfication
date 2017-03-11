@@ -36,28 +36,55 @@ def strQ2B(s):
 		res += unichr(inside_code)
 	return res
 
-def modify(s):
-	ret = re.sub(r'<[^<>]*>', '', s)
+def get_dict(name):
+	ret = set()
+	with open('../data/' + name + '.txt', 'r') as f:
+		for line in f:
+			#print line[2:-2].decode('unicode_escape')
+			ret.add(line[2:-2].decode('unicode_escape'))
+	return ret
+
+def modify1(s):
+	'''
+	Character based sentence.
+	'''
+	dic = get_dict('dict1')
 	ret = strQ2B(ret)
 	l = len(ret);
 	tmp = ''
+	flag = False
 	for i in xrange(l):
+		if flag:
+			tmp += ' '
 		if (u'A' <= ret[i] and ret[i] <= u'Z'):
 			tmp += unichr(ord(ret[i]) - ord(u'A') + ord(u'a'));
+			flag = False
 		elif (ret[i] == u'\u3010'):
 			tmp += u'['
+			flag = False
 		elif (ret[i] == u'\u3011'):
 			tmp += u']'
+			flag = False
 		elif (ret[i] == u'\u2571'):
 			tmp += u'/'
+			flag = False
 		elif (ret[i] == u'\u2014'):
 			tmp += u'-'
+			flag = False
 		elif (ret[i] == u'\u00a0' or ret[i] == u'\n' or ret[i] == u'\r' or ret[i] == u'\t'):
 			tmp += u' '
-		else:
+			flag = False
+		elif ret[i] in dic:
 			tmp += ret[i]
-	ret = pypinyin.pinyin(tmp)
-	return ret
+			flag = False
+		else:
+			t = pypinyin.pinyin(ret[i])
+			if (t[0][0] != ret[i] and t[0][0].find(u'\u0144') == -1):
+				if not flag and i != 0:
+					tmp += ' '
+				tmp += t[0][0]
+				flag = True
+	return tmp
 
 def prep(name, input_size):
 	'''
@@ -76,36 +103,29 @@ def prep(name, input_size):
 				print cnt
 			
 			obj = json.loads(line)
-			content = modify(obj['content'])
-			title = modify(obj['title'])
+			content = modify1(obj['content'])
+			title = modify1(obj['title'])
 			res = ''
 			pos = 0
 			cLen = len(content)
 			tLen = len(title)
 			
-			for i in xrange(tLen):
-				s = title[i][0]
-				res += s + ' '
-				pos += len(s) + 1
+			res = title
+			pos = tLen
 			
 			while pos < input_size:
 				res += ' '
 				pos += 1
-				for i in xrange(cLen):
-					s = content[i][0]
-					if pos + len(s) <= input_size:
-						res += s
-						pos += len(s)
-						if pos + 1 <= input_size:
-							res += ' '
-							pos += 1
-					else:
-						idx = 0
-						while pos < input_size:
-							res += s[idx]
-							pos += 1
-							idx += 1
-						break
+				if (pos + cLen <= input_size):
+					res += content
+					pos += cLen
+				else:
+					idx = 0
+					while pos < input_size:
+						res += content[idx]
+						pos += 1
+						idx += 1
+					break
 			#print obj['title']
 			#print obj['content']
 			#print res
