@@ -27,8 +27,8 @@ def load_data(name, voc, input_size=2048, mode='char'):
 		cnt = 0;
 		for line in f:
 			cnt += 1
-			if (cnt > 3 * 64): break
-			if (cnt % 1000 == 0):
+			if (cnt > 20 * 64 and name != 'test'): break
+			if (cnt == 1 or cnt % 811 == 0):
 				print "Loading data_%s now. %d data loaded.\r" % (name, cnt),
 			obj = json.loads(line)
 			#print obj['content']
@@ -37,7 +37,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 			if (name != 'test'):
 				label.append(int(obj['label']))
 			id.append(obj['id'])
-	print ""
+	print "Loading data_%s now. %d data loaded." % (name, cnt - 1)
 	return [np.array(content), np.array(label), id]
 
 def weight_variable(shape):
@@ -54,6 +54,30 @@ def conv2d(x, W, stride=[1, 1]):
 def max_pool_2x1(x):
 	return tf.nn.max_pool(x, ksize = [1, 2, 1, 1], strides = [1, 2, 1, 1], padding = 'SAME')
 
+def calc_auc(label, pred):
+	s = zip(pred, label)
+	s.sort(reverse = True)
+	#print pred
+	#print label
+	n0 = 0
+	n1 = 0
+	for l in label:
+		if l == 0:
+			n0 += 1
+		else:
+			n1 += 1
+	res = 0.0
+	ct0 = 0
+	ct1 = 0
+	for (p, l) in s:
+		#print p, l
+		if l == 1:
+			ct1 += 1
+		else:
+			ct0 += 1
+			res += (ct1 / (n1 + 0.0)) * (1. / (n0 + 0.0))
+	#print '=========================='
+	return res
 
 def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, num_filter, fc_size):
 	
@@ -142,7 +166,7 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 		weight_loss += reg * tf.nn.l2_loss(W_fc[i])
 	
 	loss = tf.sqrt(tf.reduce_mean(tf.square(tf.sub(pred[:, 1], label)))) + reg * weight_loss
-	auc, update_op = tf.contrib.metrics.streaming_auc(pred[:, 1], label)
+	#auc, update_op = tf.contrib.metrics.streaming_auc(pred[:, 1], label + 1.0)
 	
 	train_step = tf.train.AdamOptimizer(2e-4).minimize(loss)
 	saver = tf.train.Saver()
@@ -150,23 +174,29 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 	if True:
 	#with tf.InteractiveSession() as sess:
 		sess.run(tf.initialize_all_variables())
-		sess.run(tf.initialize_local_variables())
 		len_train = data_train[0].shape[0]
 		nIter = len_train / batch_size
 		for i in xrange(epoch):
 			for j in xrange(0, len_train, batch_size):
 				batch_x = data_train[0][j:j+batch_size]
 				batch_y = data_train[1][j:j+batch_size]
+				#print batch_y.shape
+				for k in xrange(len(batch_x)):
+					if batch_y[k] == 1:
+						batch_x = np.append(batch_x, [batch_x[k] for t in xrange(10)], axis = 0)
+						batch_y = np.append(batch_y, [1 for t in xrange(10)], axis = 0)
 				#print batch_x.shape
 				#print batch_y.shape
 				if j == batch_size:
 					train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})
-					for (p, q) in zip(train_y, batch_y):
-						print p, q
-					print '------------------------------------------'
+					#for (p, q) in zip(train_y[:, 1], batch_y):
+					#	print p, q
+					#print '------------------------------------------'
 				train_step.run(feed_dict = {data: batch_x, label: batch_y, dropout: 0.5})
-			train_auc = auc.eval(feed_dict = {data: batch_x, label: batch_y, dropout: 1.0})
-			val_auc = auc.eval(feed_dict = {data: data_val[0], label: data_val[1], dropout: 1.0})
+			sess.run(tf.initialize_local_variables())
+			train_auc = calc_auc(batch_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
+			val_auc = calc_auc(data_val[1], pred.eval(feed_dict = {data: data_val[0], dropout: 1.0})[:, 1])
+			#print train_auc, val_auc
 			print("step %d, train auc %g, val auc %g"%(i, train_auc, val_auc))
 			saver.save(sess, 'my-model', global_step=i)
 		test_y = pred.eval(feed_dict = {data: data_test[0], dropout: 1.0})
@@ -174,20 +204,20 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 		f_out.write('id, pred\n')
 		for (i, j) in zip(data_test[2], test_y):
 			#print i, j
-			f_out.write('%s,%.20f\n'%(i,j[1]))
+			f_out.write('%s,%.200f\n'%(i,j[1]))
 		f_out.close()
 
 if __name__ == '__main__':
 	
 	mode = 'char'
 	
-	input_size = 20#2048
+	input_size = 2048
 	num_embed = 256
-	filter_size = []#[3]#, 3]#[5, 3, 3]
-	num_filter = []#[256]#, 384]#[256, 384, 512]
-	fc_size = [50,50]#[200, 100]
+	filter_size = [5, 3, 3]
+	num_filter = [128, 256, 384]
+	fc_size = [100, 100]
 	
-	epoch = 10
+	epoch = 20
 	batch_size = 64
 	reg = 1e-3
 	
