@@ -29,7 +29,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 		cnt = 0;
 		for line in f:
 			cnt += 1
-			if (cnt > 5 * 64): break
+			#if (cnt > 5 * 64): break
 			if (cnt % 1000 == 0):
 				print "Loading data_%s now. %d data loaded.\r" % (name, cnt),
 			obj = json.loads(line)
@@ -39,6 +39,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 			if (name != 'test'):
 				label.append(int(obj['label']))
 			id.append(obj['id'])
+	print ""
 	return [content, label, id]
 
 def make_text_cnn(batch_size, input_size, voc_size, num_embed, filter_size,
@@ -100,7 +101,7 @@ def calc_auc(label, pred):
 
 def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 	print 'Trainning model...'	
-	epoch = 2
+	epoch = 10
 	learning_rate = 1e-3
 	reg = 5e-4
 	
@@ -122,7 +123,7 @@ def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 	print batch_size
 	
 	train = mx.io.NDArrayIter(np.array(data_train[0]), np.array(data_train[1]),
-							  batch_size=batch_size)#, shuffle=True)
+							  batch_size=batch_size, shuffle=True)
 	print batch_size
 	val = mx.io.NDArrayIter(np.array(data_val[0]), np.array(data_val[1]),
 							batch_size=batch_size)
@@ -164,12 +165,12 @@ def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 def main():
 	
 	mode = 'char'	# mode = 'char' or 'word'
-	input_size = 2048
-	num_embed = 32#128
+	input_size = 768
+	num_embed = 256
 	batch_size = 64
-	filter_size = [3]
-	num_filter = [16]#[128, 256]
-	fc_size = [10]#[200]
+	filter_size = [5, 3, 3]
+	num_filter = [256, 384, 512]
+	fc_size = [200, 100]
 	dropout = 0.5
 	
 	voc = get_voc('dict1')
