@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import data_helpers
 import json
+import sys
 
 def get_voc(mode):
 	if mode == 'char':
@@ -172,9 +173,15 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 		batch_x = data_val[0][j:j+batch_size]
 		batch_y = data_val[1][j:j+batch_size]
 		#train_auc = calc_auc(batch_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
+		print pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
 		np.append(test_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
 		print j
+		#sys.stdout.flush()
+	print data_val[1].T
+	print test_y
 	val_auc = calc_auc(data_val[1], test_y)
+	for (d, p) in zip(data_val[1], test_y):
+		print d, p
 	#print train_auc, val_auc
 	print("val auc %g"%(val_auc))
 	#saver.save(sess, 'my-model', global_step=i)

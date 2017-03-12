@@ -27,7 +27,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 		cnt = 0;
 		for line in f:
 			cnt += 1
-			if (cnt > 20 * 64 and name != 'test'): break
+			#if (cnt > 5 * 64): break# and name != 'test'): break
 			if (cnt == 1 or cnt % 811 == 0):
 				print "Loading data_%s now. %d data loaded.\r" % (name, cnt),
 			obj = json.loads(line)
@@ -41,11 +41,11 @@ def load_data(name, voc, input_size=2048, mode='char'):
 	return [np.array(content), np.array(label), id]
 
 def weight_variable(shape):
-	initial = tf.truncated_normal(shape, stddev = 0.1)
+	initial = tf.truncated_normal(shape, stddev = 0.02)
 	return tf.Variable(initial)
 
 def bias_variable(shape):
-	initial = tf.constant(0.1, shape = shape)
+	initial = tf.constant(0.02, shape = shape)
 	return tf.Variable(initial)
 
 def conv2d(x, W, stride=[1, 1]):
@@ -175,7 +175,11 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 	#with tf.InteractiveSession() as sess:
 		sess.run(tf.initialize_all_variables())
 		len_train = data_train[0].shape[0]
+		len_val = data_val[0].shape[0]
+		len_test = data_test[0].shape[0]
 		nIter = len_train / batch_size
+		cnt = 0
+		print "Training..."
 		for i in xrange(epoch):
 			for j in xrange(0, len_train, batch_size):
 				batch_x = data_train[0][j:j+batch_size]
@@ -187,37 +191,51 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 						batch_y = np.append(batch_y, [1 for t in xrange(10)], axis = 0)
 				#print batch_x.shape
 				#print batch_y.shape
-				if j == batch_size:
-					train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})
-					#for (p, q) in zip(train_y[:, 1], batch_y):
-					#	print p, q
-					#print '------------------------------------------'
+				cnt += 1
+				if cnt == 5:
+					cnt = 0
+					train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
+					train_auc = calc_auc(batch_y, train_y)
+					print "train_auc = %g" % train_auc
 				train_step.run(feed_dict = {data: batch_x, label: batch_y, dropout: 0.5})
-			sess.run(tf.initialize_local_variables())
-			train_auc = calc_auc(batch_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
-			val_auc = calc_auc(data_val[1], pred.eval(feed_dict = {data: data_val[0], dropout: 1.0})[:, 1])
+			val_y = np.array([])
+			#print len_train, len_val, len_test
+			for j in xrange(0, len_val, batch_size):
+				batch_x = data_val[0][j:j+batch_size]
+				tmp = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})
+				val_y = np.append(val_y, tmp[:, 1])
+				#print tmp[:, 1]
+				
+			#print val_y
+			val_auc = calc_auc(data_val[1], val_y)
+			#for (p, q) in zip(data_val[1], val_y):
+			#	print p, q
+			#print '============='
 			#print train_auc, val_auc
-			print("step %d, train auc %g, val auc %g"%(i, train_auc, val_auc))
+			print("step %d, val auc %g"%(i, val_auc))
 			saver.save(sess, 'my-model', global_step=i)
-		test_y = pred.eval(feed_dict = {data: data_test[0], dropout: 1.0})
+		test_y = np.array([])
+		for j in xrange(0, len_test, batch_size):
+			batch_x = data_test[0][j:j+batch_size]
+			test_y = np.append(test_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
 		f_out = file('../data/test.csv', 'w')
 		f_out.write('id, pred\n')
 		for (i, j) in zip(data_test[2], test_y):
 			#print i, j
-			f_out.write('%s,%.200f\n'%(i,j[1]))
+			f_out.write('%s,%.200f\n'%(i, j))
 		f_out.close()
 
 if __name__ == '__main__':
 	
 	mode = 'char'
 	
-	input_size = 2048
+	input_size = 1024
 	num_embed = 256
 	filter_size = [5, 3, 3]
 	num_filter = [128, 256, 384]
 	fc_size = [100, 100]
 	
-	epoch = 20
+	epoch = 4
 	batch_size = 64
 	reg = 1e-3
 	
