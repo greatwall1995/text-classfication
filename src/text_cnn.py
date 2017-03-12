@@ -29,7 +29,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 		cnt = 0;
 		for line in f:
 			cnt += 1
-			#if (cnt > 5 * 64): break
+			if (cnt > 5 * 64): break
 			if (cnt % 1000 == 0):
 				print "Loading data_%s now. %d data loaded.\r" % (name, cnt),
 			obj = json.loads(line)
@@ -65,8 +65,8 @@ def make_text_cnn(batch_size, input_size, voc_size, num_embed, filter_size,
 		fc = mx.sym.FullyConnected(name='fc%d' % i, data=fc, num_hidden=fc_size[i])
   		fc = mx.sym.Activation(data=fc, act_type='relu')
     	#fc = mx.sym.BatchNorm(data=fc)
-	fc = mx.sym.FullyConnected(name='final', data=fc, num_hidden=2)
-	sm = mx.sym.SoftmaxOutput(data=fc, label=input_y)
+	fc = mx.sym.FullyConnected(name='final', data=fc, num_hidden=1)
+	sm = mx.sym.LogisticRegressionOutput(data=fc, label=input_y, name='softmax')
 	return sm
 
 def setup_cnn_model(ctx, batch_size, input_size, voc_size, num_embed, filter_size,
@@ -74,7 +74,7 @@ def setup_cnn_model(ctx, batch_size, input_size, voc_size, num_embed, filter_siz
 
 	return make_text_cnn(batch_size, input_size, voc_size, num_embed, filter_size,
 						num_filter, fc_size, dropout)
-
+	
 
 def calc_auc(label, pred):
 	s = zip(pred, label)
@@ -165,7 +165,7 @@ def train_cnn(ctx, cnn_model, data_train, data_val, data_test, batch_size):
 def main():
 	
 	mode = 'char'	# mode = 'char' or 'word'
-	input_size = 768
+	input_size = 2048
 	num_embed = 256
 	batch_size = 64
 	filter_size = [5, 3, 3]
