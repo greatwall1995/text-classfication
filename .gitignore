@@ -4,3 +4,4 @@
 *.params
 *.meta
 */my-model*
+/src/checkpoint

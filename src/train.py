@@ -69,6 +69,8 @@ def calc_auc(label, pred):
 	res = 0.0
 	ct0 = 0
 	ct1 = 0
+	if n0 == 0 or n1 == 0:
+		return 1
 	for (p, l) in s:
 		#print p, l
 		if l == 1:
@@ -192,7 +194,7 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 				#print batch_x.shape
 				#print batch_y.shape
 				cnt += 1
-				if cnt == 5:
+				if cnt == 15:
 					cnt = 0
 					train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
 					train_auc = calc_auc(batch_y, train_y)
