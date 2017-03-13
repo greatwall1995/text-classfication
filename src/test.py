@@ -28,7 +28,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 		cnt = 0;
 		for line in f:
 			cnt += 1
-			if (cnt > 20 * 64): break# and name != 'test'): break
+			#if (cnt > 20 * 64): break# and name != 'test'): break
 			if (cnt == 1 or cnt % 811 == 0):
 				print "Loading data_%s now. %d data loaded.\r" % (name, cnt),
 			obj = json.loads(line)
@@ -166,38 +166,44 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 	train_step = tf.train.AdamOptimizer(2e-4).minimize(loss)
 	saver = tf.train.Saver()
 	sess = tf.InteractiveSession()
-	saver.restore(sess, 'my-model-0')
-	test_y = np.array([])
-	len_train = len(data_train[0])
-	for j in xrange(0, len_train, batch_size):
+	saver.restore(sess, 'my-model-1')
+	val_y = np.array([])
+	len_val = len(data_val[0])
+	len_test = len(data_test[0])
+	cnt = 0
+	for j in xrange(0, len_val, batch_size):
 		batch_x = data_val[0][j:j+batch_size]
 		batch_y = data_val[1][j:j+batch_size]
+		cnt += 1
+		if cnt == 20:
+			cnt = 0
+			print j, len_val
 		#train_auc = calc_auc(batch_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
-		print pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
-		np.append(test_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
-		print j
+		#print pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
+		val_y = np.append(val_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
+		#print j
 		#sys.stdout.flush()
-	print data_val[1].T
-	print test_y
-	val_auc = calc_auc(data_val[1], test_y)
-	for (d, p) in zip(data_val[1], test_y):
-		print d, p
-	#print train_auc, val_auc
+	#print data_val[1].T
+	#print test_y
+	val_auc = calc_auc(data_val[1], val_y)
 	print("val auc %g"%(val_auc))
 	#saver.save(sess, 'my-model', global_step=i)
-	#test_y = pred.eval(feed_dict = {data: data_test[0], dropout: 1.0})
-	#f_out = file('../data/test.csv', 'w')
-	#f_out.write('id, pred\n')
-	#for (i, j) in zip(data_test[2], test_y):
-	#	print i, j
-	#	f_out.write('%s,%.200f\n'%(i,j[1]))
-	#f_out.close()
+	test_y = np.array([])
+	for j in xrange(0, len_test, batch_size):
+		batch_x = data_test[0][j:j+batch_size]
+		test_y = np.append(test_y, pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1])
+	f_out = file('../data/test.csv', 'w')
+	f_out.write('id, pred\n')
+	for (i, j) in zip(data_test[2], test_y):
+		#print i, j
+		f_out.write('%s,%.200f\n'%(i, j))
+	f_out.close()
 
 if __name__ == '__main__':
 	
 	mode = 'char'
 	
-	input_size = 2048
+	input_size = 1024
 	num_embed = 256
 	filter_size = [5, 3, 3]
 	num_filter = [128, 256, 384]
@@ -211,7 +217,7 @@ if __name__ == '__main__':
 	print 'Loading data...'
 	voc = get_voc(mode)
 	voc_size = len(voc)
-	data_train = load_data('train', voc, input_size=input_size, mode=mode)
+	#data_train = load_data('train', voc, input_size=input_size, mode=mode)
 	data_val = load_data('val', voc, input_size=input_size, mode=mode)
 	data_test = load_data('test', voc, input_size=input_size, mode=mode)
 	

@@ -17,6 +17,14 @@ def split():
 	with open('../data/org.json', 'r') as f:
 		for line in f:
 			cnt += 1
+			obj = json.loads(line)
+			if (obj['label'] == 'True' or obj['label'] == 'true'):
+				print 'True'
+				obj['label'] = 1
+			elif (obj['label'] == 'False' or obj['label'] == 'false'):
+				print 'False'
+				obj['label'] = 0
+			line = json.dumps(obj)
 			if cnt % 10 != 0:
 				train_f.write(line)
 			else:
