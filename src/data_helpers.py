@@ -18,13 +18,13 @@ def split():
 		for line in f:
 			cnt += 1
 			obj = json.loads(line)
-			if (obj['label'] == 'True' or obj['label'] == 'true'):
+			if (obj['label'] == True):
 				print 'True'
-				obj['label'] = 1
-			elif (obj['label'] == 'False' or obj['label'] == 'false'):
+				obj['label'] = 0
+			elif (obj['label'] == False):
 				print 'False'
 				obj['label'] = 0
-			line = json.dumps(obj)
+			line = json.dumps(obj) + '\n'
 			if cnt % 10 != 0:
 				train_f.write(line)
 			else:
@@ -57,7 +57,7 @@ def modify1(s):
 	Character based sentence.
 	'''
 	dic = get_dict('dict1')
-	ret = strQ2B(ret)
+	ret = strQ2B(s)
 	l = len(ret);
 	tmp = ''
 	flag = False
@@ -94,43 +94,80 @@ def modify1(s):
 				flag = True
 	return tmp
 
-def prep(name, input_size):
+def modify2(s):
+	'''
+	Character based sentence.
+	'''
+	dic = get_dict('dict1')
+	ret = strQ2B(s)
+	l = len(ret);
+	tmp = []
+	for i in xrange(l):
+		if (u'A' <= ret[i] and ret[i] <= u'Z'):
+			tmp.append(unichr(ord(ret[i]) - ord(u'A') + ord(u'a')))
+		elif (ret[i] == u'\u3010'):
+			tmp.append(u'[')
+		elif (ret[i] == u'\u3011'):
+			tmp.append(u']')
+		elif (ret[i] == u'\u2571'):
+			tmp.append(u'/')
+		elif (ret[i] == u'\u2014'):
+			tmp.append(u'-')
+		elif (ret[i] == u'\u00a0' or ret[i] == u'\n' or ret[i] == u'\r' or ret[i] == u'\t'):
+			tmp.append(u' ')
+		elif ret[i] in dic:
+			tmp.append(ret[i])
+		else:
+			t = pypinyin.pinyin(ret[i])
+			if (t[0][0] != ret[i]):
+				tmp.append(t[0][0])
+	return tmp
+
+def prep(name, input_size, mode):
 	'''
 	Dealing with raw data.
 	'''
 	
 	f_out = file('../tmp/' + name + '.json', 'w')
 	
-	cnt = 0;
+	cnt = 0
 	
 	with open('../data/' + name + '.json', 'r') as f_in:
 		for line in f_in:
 			
 			cnt += 1
 			if (cnt % 1000 == 0):
+				#if cnt == 100: break
 				print cnt
 			
 			obj = json.loads(line)
-			content = modify1(obj['content'])
-			title = modify1(obj['title'])
+			obj['content'] = re.sub(u'<[ -~]*>', u'', obj['content'])
+			obj['title'] = re.sub(u'<[ -~]*>', u'', obj['title'])
+			if (mode == 'char'):
+				content = modify1(obj['content'])
+				title = modify1(obj['title'])
+			elif (mode == 'word'):
+				content = modify2(obj['content'])
+				title = modify2(obj['title'])
 			res = ''
 			pos = 0
 			cLen = len(content)
 			tLen = len(title)
 			
-			res = title
+			res = "'".join(title)
 			pos = tLen
 			
 			while pos < input_size:
-				res += ' '
-				pos += 1
-				if (pos + cLen <= input_size):
-					res += content
+				if (cLen == 0):
+					res += "' "
+					pos += 1
+				elif (pos + cLen <= input_size):
+					res += "'" + "'".join(content)
 					pos += cLen
 				else:
 					idx = 0
 					while pos < input_size:
-						res += content[idx]
+						res += "'" + content[idx]
 						pos += 1
 						idx += 1
 					break
@@ -144,12 +181,12 @@ def prep(name, input_size):
 		
 	f_out.close()
 
-def preprocess(input_size=2048):
+def preprocess(input_size=2048, mode='char'):
 	
 	print 'Preprocessing...'
-	prep("train", input_size)
-	prep("val", input_size)
-	prep("test", input_size)
+	prep("train", input_size, mode)
+	prep("val", input_size, mode)
+	prep("test", input_size, mode)
 	print 'Preprocessing done.'
 
 def stat(name, dic):
@@ -157,7 +194,7 @@ def stat(name, dic):
 	with open('../tmp/' + name + '.json', 'r') as f:
 		for line in f:
 			cont = json.loads(line)['content']
-			for c in cont:
+			for c in cont.split("'"):
 				dic[c] = dic.get(c, 0) + 1
 
 def statistic():

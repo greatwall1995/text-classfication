@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import data_helpers
+import data_helpers as dh
 import json
 
 def get_voc(mode):
@@ -224,12 +224,14 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, 
 		f_out.write('id, pred\n')
 		for (i, j) in zip(data_test[2], test_y):
 			#print i, j
-			f_out.write('%s,%.200f\n'%(i, j))
+			f_out.write('%s,%.30f\n'%(i, j))
 		f_out.close()
 
 if __name__ == '__main__':
 	
-	mode = 'char'
+	mode = 'word'
+	#dh.preprocess(mode=mode)
+	dh.statistic()
 	
 	input_size = 1024
 	num_embed = 256
@@ -242,15 +244,15 @@ if __name__ == '__main__':
 	reg = 1e-3
 	
 	# loading data
-	print 'Loading data...'
-	voc = get_voc(mode)
-	voc_size = len(voc)
-	data_train = load_data('train', voc, input_size=input_size, mode=mode)
-	data_val = load_data('val', voc, input_size=input_size, mode=mode)
-	data_test = load_data('test', voc, input_size=input_size, mode=mode)
+	#print 'Loading data...'
+	#voc = get_voc(mode)
+	#voc_size = len(voc)
+	#data_train = load_data('train', voc, input_size=input_size, mode=mode)
+	#data_val = load_data('val', voc, input_size=input_size, mode=mode)
+	#data_test = load_data('test', voc, input_size=input_size, mode=mode)
 	
 	#print data_train[0].shape
 	#print data_val[0].shape
 	#print data_test[0].shape
 	
-	train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, num_filter, fc_size)
+	#train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size, num_filter, fc_size)
