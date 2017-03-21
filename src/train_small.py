@@ -117,7 +117,7 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 	b_fc = [0] * num_fc[2]
 	h_fc = [0] * num_fc[2]
 	h_drop = [0] * num_fc[2]
-	if True:
+	with tf.device('/gpu:2'):
 		embed_weight = tf.Variable(tf.random_uniform([voc_size, num_embed], -1.0, 1.0))
 		embed = tf.nn.embedding_lookup(embed_weight, data)
 		embed_expanded = tf.expand_dims(embed, -1)
@@ -242,7 +242,7 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 		#auc, update_op = tf.contrib.metrics.streaming_auc(pred[:, 1], label + 1.0)
 		
 		train_step = tf.train.AdamOptimizer(2e-4).minimize(loss)
-		saver = tf.train.Saver()
+
 	sess = tf.InteractiveSession()
 	sess.run(tf.initialize_all_variables())
 	len_train = data_train[0].shape[0]
@@ -256,11 +256,11 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 			batch_x = data_train[0][j:j+batch_size]
 			batch_y = data_train[1][j:j+batch_size]
 			cnt += 1
-			if cnt == 5:
-				cnt = 0
-				train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
-				train_auc = calc_auc(batch_y, train_y)
-				print "train_auc = %g" % train_auc
+			#if cnt == 5:
+			#	cnt = 0
+			#	train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
+			#	train_auc = calc_auc(batch_y, train_y)
+			#	print "train_auc = %g" % train_auc
 			for k in xrange(len(batch_x)):
 				if batch_y[k] == 1:
 					batch_x = np.append(batch_x, [batch_x[k] for t in xrange(10)], axis = 0)
@@ -282,8 +282,6 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 		#print '============='
 		#print train_auc, val_auc
 		print("step %d, val auc %g"%(i, val_auc))
-		saver.save(sess, 'my-model', global_step=i)
-		print "model saved"
 		test_y = np.array([])
 		for j in xrange(0, len_test, batch_size):
 			batch_x = data_test[0][j:j+batch_size]
@@ -302,14 +300,14 @@ if __name__ == '__main__':
 	#dh.statistic()
 	
 	input_size = 768
-	num_embed = 1024
+	num_embed = 256
 	filter_size = 3
-	num_filter = [[864, 864], [512] * 8]
-	fc_size = 200
+	num_filter = [[256], [128, 128, 256, 256]]
+	fc_size = 150
 	num_fc = [1, 1, 2]
 	
 	epoch = 5
-	batch_size = 64
+	batch_size = 25
 	reg = 1e-3
 	
 	# loading data
