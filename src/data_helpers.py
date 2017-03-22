@@ -1,6 +1,6 @@
 import json
 import re
-import pypinyin
+import jieba
 
 def split():
 	'''
@@ -44,67 +44,25 @@ def strQ2B(s):
 		res += unichr(inside_code)
 	return res
 
-def get_dict(name):
-	ret = set()
-	with open('../data/' + name + '.txt', 'r') as f:
-		for line in f:
-			#print line[2:-2].decode('unicode_escape')
-			ret.add(line[2:-2].decode('unicode_escape'))
-	return ret
+#def get_dict():
+	#ret = set()
+	#with open('../data/dict.txt', 'r') as f:
+	#	for line in f:
+	#		ret.add(line[2:-2].decode('unicode_escape'))
+	#return ret
 
-def modify1(s):
+def modify(s, dic):
 	'''
 	Character based sentence.
 	'''
-	dic = get_dict('dict1')
+	#dic = get_dict('dict')
 	ret = strQ2B(s)
-	l = len(ret);
-	tmp = ''
-	flag = False
-	for i in xrange(l):
-		if flag:
-			tmp += ' '
-		if (u'A' <= ret[i] and ret[i] <= u'Z'):
-			tmp += unichr(ord(ret[i]) - ord(u'A') + ord(u'a'));
-			flag = False
-		elif (ret[i] == u'\u3010'):
-			tmp += u'['
-			flag = False
-		elif (ret[i] == u'\u3011'):
-			tmp += u']'
-			flag = False
-		elif (ret[i] == u'\u2571'):
-			tmp += u'/'
-			flag = False
-		elif (ret[i] == u'\u2014'):
-			tmp += u'-'
-			flag = False
-		elif (ret[i] == u'\u00a0' or ret[i] == u'\n' or ret[i] == u'\r' or ret[i] == u'\t'):
-			tmp += u' '
-			flag = False
-		elif ret[i] in dic:
-			tmp += ret[i]
-			flag = False
-		else:
-			t = pypinyin.pinyin(ret[i])
-			if (t[0][0] != ret[i] and t[0][0].find(u'\u0144') == -1):
-				if not flag and i != 0:
-					tmp += ' '
-				tmp += t[0][0]
-				flag = True
-	return tmp
-
-def modify2(s):
-	'''
-	Character based sentence.
-	'''
-	dic = get_dict('dict1')
-	ret = strQ2B(s)
-	l = len(ret);
+	ret = jieba.lcut(ret)
 	tmp = []
+	l = len(ret);
 	for i in xrange(l):
 		if (u'A' <= ret[i] and ret[i] <= u'Z'):
-			tmp.append(unichr(ord(ret[i]) - ord(u'A') + ord(u'a')))
+			tmp.append(ret[i].lower())
 		elif (ret[i] == u'\u3010'):
 			tmp.append(u'[')
 		elif (ret[i] == u'\u3011'):
@@ -115,15 +73,20 @@ def modify2(s):
 			tmp.append(u'-')
 		elif (ret[i] == u'\u00a0' or ret[i] == u'\n' or ret[i] == u'\r' or ret[i] == u'\t'):
 			tmp.append(u' ')
-		elif ret[i] in dic:
-			tmp.append(ret[i])
 		else:
-			t = pypinyin.pinyin(ret[i])
-			if (t[0][0] != ret[i]):
-				tmp.append(t[0][0])
-	return tmp
+			tmp.append(ret[i])
+	ret = tmp
+	for i in xrange(l):
+		word = ret[i]
+		#print ret
+		if (dic.has_key(word)):
+			ret[i] = dic[word]
+		else:
+			ret[i] = len(dic)
+			dic[word] = len(dic)
+	return ret
 
-def prep(name, input_size, mode):
+def prep(name, input_size, dic):
 	'''
 	Dealing with raw data.
 	'''
@@ -136,44 +99,42 @@ def prep(name, input_size, mode):
 		for line in f_in:
 			
 			cnt += 1
-			if (cnt % 1000 == 0):
-				#if cnt == 100: break
-				print cnt
+			if cnt % 1000 == 0:
+				print 'solved %d' % cnt
 			
 			obj = json.loads(line)
 			obj['content'] = re.sub(u'<[ -~]*>', u'', obj['content'])
 			obj['title'] = re.sub(u'<[ -~]*>', u'', obj['title'])
-			if (mode == 'char'):
-				content = modify1(obj['content'])
-				title = modify1(obj['title'])
-			elif (mode == 'word'):
-				content = modify2(obj['content'])
-				title = modify2(obj['title'])
-			res = ''
+			#print obj['title']
+			#print obj['content']
+			content = modify(obj['content'], dic)
+			title = modify(obj['title'], dic)
+			res = []
 			pos = 0
 			cLen = len(content)
 			tLen = len(title)
 			
-			res = "'".join(title)
+			res = title
 			pos = tLen
 			
 			while pos < input_size:
 				if (cLen == 0):
-					res += "' "
+					res.append(dic[' '])
 					pos += 1
 				elif (pos + cLen <= input_size):
-					res += "'" + "'".join(content)
+					res.extend(content)
 					pos += cLen
 				else:
 					idx = 0
 					while pos < input_size:
-						res += "'" + content[idx]
+						res.append(content[idx])
 						pos += 1
 						idx += 1
 					break
 			#print obj['title']
 			#print obj['content']
 			#print res
+			#print '---------------------------------'
 			
 			obj['content'] = res
 			obj.pop('title')
@@ -181,31 +142,17 @@ def prep(name, input_size, mode):
 		
 	f_out.close()
 
-def preprocess(input_size=2048, mode='char'):
+def preprocess(input_size=2048):
 	
-	print 'Preprocessing...'
-	prep("train", input_size, mode)
-	prep("val", input_size, mode)
-	prep("test", input_size, mode)
-	print 'Preprocessing done.'
-
-def stat(name, dic):
-	
-	with open('../tmp/' + name + '.json', 'r') as f:
-		for line in f:
-			cont = json.loads(line)['content']
-			for c in cont.split("'"):
-				dic[c] = dic.get(c, 0) + 1
-
-def statistic():
 	dic = {}
-	
-	stat("train", dic)
-	stat("val", dic)
-	stat("test", dic)
-	
-	stat_file = file('../tmp/stat.txt', 'w')
-	for c in dic:
-		obj = {'char': c, 'num': dic[c]}
-		stat_file.write(json.dumps(obj) + '\n')
-	stat_file.close()
+	print 'Preprocessing...'
+	prep("train", input_size, dic)
+	prep("val", input_size, dic)
+	prep("test", input_size, dic)
+	print 'Preprocessing done.'
+	print 'Outputing dictionary'
+	with file('../data/dict.txt', 'w') as f:
+		for word in dic:
+			f.write(word.encode('utf-8'))
+			f.write(" %d\n" % dic[word])
+	print 'Done'
