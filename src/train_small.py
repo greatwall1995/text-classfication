@@ -1,30 +1,8 @@
 import tensorflow as tf
 import numpy as np
-import data_helpers
 import json
 
-#CUDA_VISIBLE_DEVICES=2
-
-def get_voc(mode):
-	if mode == 'char':
-		name = 'dict1'
-	elif mode == 'word':
-		name = 'dict2'
-	dic = data_helpers.get_dict(name)
-	voc = {}
-	for (i, ch) in enumerate(dic):
-		voc[ch] = i
-	return voc
-
-def translate(content, voc, input_size, mode='char'):
-	l = len(content)
-	res = []
-	for i in xrange(input_size):
-		#print content[i]
-		res.append(voc[content[i]])
-	return res
-
-def load_data(name, voc, input_size=2048, mode='char'):
+def load_data(name, input_size=2048):
 	content = []
 	label = []
 	id = []
@@ -37,7 +15,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 				print "Loading data_%s now. %d data loaded.\r" % (name, cnt),
 			obj = json.loads(line)
 			#print obj['content']
-			content.append(translate(obj['content'].split("'"), voc, input_size, mode = 'char'))
+			content.append(obj['content'][0:input_size])
 			#print content[len(content) - 1]
 			if (name != 'test'):
 				label.append(int(obj['label']))
@@ -256,11 +234,11 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 			batch_x = data_train[0][j:j+batch_size]
 			batch_y = data_train[1][j:j+batch_size]
 			cnt += 1
-			#if cnt == 5:
-			#	cnt = 0
-			#	train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
-			#	train_auc = calc_auc(batch_y, train_y)
-			#	print "train_auc = %g" % train_auc
+			if cnt == 5:
+				cnt = 0
+				train_y = pred.eval(feed_dict = {data: batch_x, dropout: 1.0})[:, 1]
+				train_auc = calc_auc(batch_y, train_y)
+				print "train_auc = %g" % train_auc
 			for k in xrange(len(batch_x)):
 				if batch_y[k] == 1:
 					batch_x = np.append(batch_x, [batch_x[k] for t in xrange(10)], axis = 0)
@@ -295,12 +273,11 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 
 if __name__ == '__main__':
 	
-	mode = 'word'
 	#dh.preprocess(mode=mode)
 	#dh.statistic()
 	
-	input_size = 768
-	num_embed = 256
+	input_size = 384
+	num_embed = 96
 	filter_size = 3
 	num_filter = [[256], [128, 128, 256, 256]]
 	fc_size = 150
@@ -312,11 +289,10 @@ if __name__ == '__main__':
 	
 	# loading data
 	print 'Loading data...'
-	voc = get_voc(mode)
-	voc_size = len(voc)
-	data_train = load_data('train', voc, input_size=input_size, mode=mode)
-	data_val = load_data('val', voc, input_size=input_size, mode=mode)
-	data_test = load_data('test', voc, input_size=input_size, mode=mode)
+	voc_size = 1331065
+	data_train = load_data('train', input_size=input_size)
+	data_val = load_data('val', input_size=input_size)
+	data_test = load_data('test', input_size=input_size)
 	
 	print data_train[0].shape
 	print data_val[0].shape

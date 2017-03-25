@@ -1,30 +1,8 @@
 import tensorflow as tf
 import numpy as np
-import data_helpers
 import json
 
-#CUDA_VISIBLE_DEVICES=2
-
-def get_voc(mode):
-	if mode == 'char':
-		name = 'dict1'
-	elif mode == 'word':
-		name = 'dict2'
-	dic = data_helpers.get_dict(name)
-	voc = {}
-	for (i, ch) in enumerate(dic):
-		voc[ch] = i
-	return voc
-
-def translate(content, voc, input_size, mode='char'):
-	l = len(content)
-	res = []
-	for i in xrange(input_size):
-		#print content[i]
-		res.append(voc[content[i]])
-	return res
-
-def load_data(name, voc, input_size=2048, mode='char'):
+def load_data(name, input_size=2048):
 	content = []
 	label = []
 	id = []
@@ -37,7 +15,7 @@ def load_data(name, voc, input_size=2048, mode='char'):
 				print "Loading data_%s now. %d data loaded.\r" % (name, cnt),
 			obj = json.loads(line)
 			#print obj['content']
-			content.append(translate(obj['content'].split("'"), voc, input_size, mode = 'char'))
+			content.append(obj['content'][0:input_size])
 			#print content[len(content) - 1]
 			if (name != 'test'):
 				label.append(int(obj['label']))
@@ -211,8 +189,9 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 				W_fc[i] = weight_variable([fc_size, fc_size])
 				b_fc[i] = bias_variable([fc_size])
 			if i == 0:
-				h_fc[i] = tf.add(tf.nn.relu(tf.matmul(h_drop_1[0], W_1) + b_1),
-				tf.nn.relu(tf.matmul(h_drop_2[0], W_2) + b_2))
+				s1 = tf.matmul(h_drop_1[0], W_1) + b_1
+				s2 = tf.matmul(h_drop_2[0], W_2) + b_2
+				h_fc[i] = tf.nn.relu(tf.add(s1, s2))
 			else:
 				h_fc[i] = tf.nn.relu(tf.matmul(h_fc[i - 1], W_fc[i]) + b_fc[i])
 			h_drop[i] = tf.nn.dropout(h_fc[i], dropout)
@@ -242,7 +221,7 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 		#auc, update_op = tf.contrib.metrics.streaming_auc(pred[:, 1], label + 1.0)
 		
 		train_step = tf.train.AdamOptimizer(2e-4).minimize(loss)
-		saver = tf.train.Saver()
+
 	sess = tf.InteractiveSession()
 	sess.run(tf.initialize_all_variables())
 	len_train = data_train[0].shape[0]
@@ -282,8 +261,6 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 		#print '============='
 		#print train_auc, val_auc
 		print("step %d, val auc %g"%(i, val_auc))
-		saver.save(sess, 'my-model', global_step=i)
-		print "model saved"
 		test_y = np.array([])
 		for j in xrange(0, len_test, batch_size):
 			batch_x = data_test[0][j:j+batch_size]
@@ -297,28 +274,26 @@ def train(epoch, batch_size, reg, voc_size, input_size, num_embed, filter_size,
 
 if __name__ == '__main__':
 	
-	mode = 'word'
 	#dh.preprocess(mode=mode)
 	#dh.statistic()
 	
-	input_size = 768
-	num_embed = 1024
+	input_size = 512
+	num_embed = 80
 	filter_size = 3
-	num_filter = [[864, 864], [512] * 8]
-	fc_size = 200
+	num_filter = [[768, 768], [512] * 8]
+	fc_size = 300
 	num_fc = [1, 1, 2]
 	
-	epoch = 5
+	epoch = 3
 	batch_size = 64
 	reg = 1e-3
 	
 	# loading data
 	print 'Loading data...'
-	voc = get_voc(mode)
-	voc_size = len(voc)
-	data_train = load_data('train', voc, input_size=input_size, mode=mode)
-	data_val = load_data('val', voc, input_size=input_size, mode=mode)
-	data_test = load_data('test', voc, input_size=input_size, mode=mode)
+	voc_size = 1331065
+	data_train = load_data('train', input_size=input_size)
+	data_val = load_data('val', input_size=input_size)
+	data_test = load_data('test', input_size=input_size)
 	
 	print data_train[0].shape
 	print data_val[0].shape
